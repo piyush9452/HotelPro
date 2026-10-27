@@ -5,6 +5,19 @@ HotelPro is a full-stack MERN application for a single hotel. Guests can search 
 - **Frontend:** React 19 + Vite, Tailwind CSS 4, React Router 7, React Hook Form, Axios, Recharts, react-day-picker
 - **Backend:** Node.js 20 + Express 4, MongoDB + Mongoose 8, Zod validation, JWT in HttpOnly cookies
 - **Payments:** Razorpay (orders, signature verification, webhooks, refunds). A clearly labelled **development-only mock gateway** is used when no keys are configured.
+- **Hosting:** website on Vercel, API on Render, database on MongoDB Atlas, images on Cloudinary
+
+### Live deployment
+
+| Part | URL | Host |
+|---|---|---|
+| Website | https://hotel-pro-two.vercel.app | Vercel (`client/`) |
+| API | https://hotelpro-xla6.onrender.com/api | Render (`server/`) |
+| Health check | https://hotelpro-xla6.onrender.com/api/health | should report `"database":"connected"` |
+
+Admin dashboard: https://hotel-pro-two.vercel.app/admin (sign in with the seeded admin account; credentials are not stored in this repository).
+
+> **Status:** the live site, accounts, bookings, cancellations, admin tools, reports and Cloudinary uploads are working. **Online payment is not enabled yet**: add Razorpay keys on Render (see [Payment gateway setup](#payment-gateway-setup-razorpay)). Until then, guests can create bookings but cannot pay, and unpaid bookings expire after 15 minutes.
 
 ---
 
@@ -52,46 +65,62 @@ HotelPro is a full-stack MERN application for a single hotel. Guests can search 
 
 ## Folder structure
 
+The frontend and backend are independent apps with their own `package.json`.
+
 ```text
 HotelPro/
-├── client/                         React + Vite frontend
-│   ├── public/                     favicon
+├── client/                              React + Vite frontend (deployed to Vercel)
+│   ├── public/favicon.svg
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── common/             Button, form controls, Modal/ConfirmDialog, Pagination, Badges, route guards…
-│   │   │   ├── layout/             Navbar, Footer, MainLayout, AdminLayout, AuthLayout
-│   │   │   ├── rooms/              RoomCard, RoomGallery, RoomFilters, amenity icons
-│   │   │   ├── booking/            SearchForm, DateRangePicker, GuestSelector, PriceSummary, PaymentPanel…
-│   │   │   └── dashboard/          KPI cards, charts, data table, admin header
-│   │   ├── pages/                  Home, Rooms, RoomDetails, Booking, BookingDetails, MyBookings, Profile, auth pages…
-│   │   │   └── admin/              Dashboard, AdminRooms, RoomEditor, AdminBookings, AdminUsers, Reports, Messages, AuditLogs
-│   │   ├── context/AuthContext.jsx
-│   │   ├── hooks/                  useAsync, usePayment, useStayParams, useQueryFilters…
-│   │   ├── services/               Axios client (CSRF + session handling) and one module per API area
-│   │   ├── utils/                  date helpers, formatting, constants, validation rules
-│   │   ├── __tests__/              Vitest + React Testing Library
-│   │   ├── App.jsx, main.jsx, index.css
+│   │   │   ├── common/                  Button, FormControls, Modal + ConfirmDialog, Pagination, Badge,
+│   │   │   │                            Feedback (spinner/skeleton/empty/error), Popover, RouteGuards, PageHero, Logo
+│   │   │   ├── layout/                  Navbar (+ mobile menu), Footer, MainLayout, AdminLayout, AuthLayout
+│   │   │   ├── rooms/                   RoomCard, RoomGallery (lightbox), RoomFilters, amenityIcons
+│   │   │   ├── booking/                 SearchForm, DateRangePicker, GuestSelector, PriceSummary, PaymentPanel,
+│   │   │   │                            BookingSummaryCard, CancelBookingDialog, Steps
+│   │   │   └── dashboard/               KpiCard, Charts, DataTable, SearchInput, AdminPageHeader
+│   │   ├── pages/
+│   │   │   ├── Home, Rooms, RoomDetails, Booking, BookingDetails, MyBookings, Profile
+│   │   │   ├── Login, Register, ForgotPassword, ResetPassword
+│   │   │   ├── Contact, About, Privacy, Terms, LegalPage, NotFound
+│   │   │   └── admin/                   Dashboard, AdminRooms, RoomEditor, AdminBookings, AdminBookingDetail,
+│   │   │                                AdminUsers, AdminUserDetail, Reports, Messages, AuditLogs
+│   │   ├── context/AuthContext.jsx      session state, login/register/logout
+│   │   ├── hooks/                       useAsync, usePayment, useStayParams, useQueryFilters,
+│   │   │                                useCountdown, useDebounce, useDocumentTitle
+│   │   ├── services/                    api.js (Axios: cookies, CSRF, session expiry) + auth/room/booking/
+│   │   │                                payment/admin/contact services
+│   │   ├── utils/                       dates, format, constants, validation
+│   │   ├── __tests__/                   Vitest + React Testing Library
+│   │   ├── test/setup.js
+│   │   ├── App.jsx                      routes (admin area lazy-loaded)
+│   │   ├── main.jsx, index.css          entry point, Tailwind theme
+│   ├── index.html, vite.config.js
+│   ├── vercel.json                      SPA rewrite so deep links work
 │   ├── .env.example
-│   ├── vercel.json                 SPA rewrite for Vercel
 │   └── package.json
-├── server/                         Express API
-│   ├── config/                     env loading/validation, MongoDB connection
-│   ├── controllers/                auth, rooms, bookings, payments, admin, contact
-│   ├── middleware/                 auth/roles, CSRF, validation, sanitising, rate limits, uploads, errors
-│   ├── models/                     User, Room, RoomInventory, Booking, Payment, PasswordResetToken, AuditLog, ContactMessage
-│   ├── routes/                     REST routes under /api
-│   ├── services/                   booking rules, inventory ledger, payments + gateway abstraction, email, uploads, audit
-│   ├── validators/                 Zod schemas
-│   ├── utils/                      dates (timezone-aware), pricing, CSV, HTTP helpers, logger
-│   ├── scripts/seed.js             rooms + admin seeding
-│   ├── tests/                      Node test runner + Supertest + in-memory MongoDB
-│   ├── uploads/                    local image storage (development fallback)
-│   ├── app.js, index.js
+├── server/                              Express API (deployed to Render)
+│   ├── config/                          env.js (loads + validates settings), db.js (MongoDB connection)
+│   ├── controllers/                     auth, room, booking, payment, admin, contact
+│   ├── middleware/                      auth + roles, csrf, validate (Zod), sanitize, rateLimit, upload, error
+│   ├── models/                          User, Room, RoomInventory, Booking, Payment,
+│   │                                    PasswordResetToken, AuditLog, ContactMessage
+│   ├── routes/                          auth, room, booking, payment, admin, contact routes
+│   ├── services/                        bookingService, inventoryService, stayService, paymentService,
+│   │                                    paymentGateway (Razorpay + dev mock), emailService, uploadService, auditService
+│   ├── validators/                      Zod schemas: common, auth, room, booking, misc
+│   ├── utils/                           dates (hotel timezone), pricing, csv, http helpers, ApiError, logger
+│   ├── scripts/seed.js                  room catalogue + admin account
+│   ├── tests/                           Node test runner + Supertest + in-memory MongoDB
+│   ├── uploads/                         local image storage (only when Cloudinary is not configured)
+│   ├── app.js                           Express app (middleware + routes)
+│   ├── index.js                         start-up, expiry sweeper, graceful shutdown
 │   ├── .env.example
 │   └── package.json
 ├── docs/HotelPro.postman_collection.json
-├── render.yaml                     Render blueprint for the API
-├── .gitignore
+├── render.yaml                          optional Render Blueprint for the API
+├── .gitignore                           keeps .env files, node_modules, dist and uploads out of Git
 └── README.md
 ```
 
@@ -341,7 +370,7 @@ Import **`docs/HotelPro.postman_collection.json`** into Postman for ready-made r
 
 ```bash
 cd server && npm test     # 79 API tests
-cd client && npm test     # 19 UI tests
+cd client && npm test     # 20 UI tests
 ```
 
 The **API tests** use Node's built-in test runner, Supertest and `mongodb-memory-server`, so no local database is needed. The first run downloads a MongoDB binary. They cover:
@@ -352,15 +381,15 @@ The **API tests** use Node's built-in test runner, Supertest and `mongodb-memory
 - payment orders, signature verification, duplicate callbacks, failed checkouts, late payments, webhooks
 - dashboard and report access, CSV export, user deactivation, audited status transitions, error handling, CORS and security headers
 
-The **UI tests** (Vitest + React Testing Library) cover route guards, the login form, the guest selector rules, price summary, room card availability, pagination, the confirm dialog and helpers.
+The **UI tests** (Vitest + React Testing Library) cover route guards, the login form, contact-form prefill for signed-in users, the guest selector rules, price summary, room card availability, pagination, the confirm dialog and helpers.
 
 ---
 
 ## Payment gateway setup (Razorpay)
 
 1. Create a Razorpay account and switch to **Test Mode**.
-2. *Settings → API Keys* → generate a key pair, then set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `server/.env`.
-3. *Settings → Webhooks* → add `https://<your-api>/api/payments/webhook` with the events `payment.captured`, `order.paid`, `payment.failed` and `refund.processed`. Choose a secret and set it as `RAZORPAY_WEBHOOK_SECRET`.
+2. *Settings → API Keys* → generate a key pair, then set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `server/.env` (local) and in Render → Environment (live).
+3. *Settings → Webhooks* → add `https://<your-api>/api/payments/webhook` (live: `https://hotelpro-xla6.onrender.com/api/payments/webhook`) with the events `payment.captured`, `order.paid`, `payment.failed` and `refund.processed`. Choose a secret and set it as `RAZORPAY_WEBHOOK_SECRET`.
 4. Restart the API. `GET /api/payments/config` should report `"provider": "razorpay"`, and checkout now opens Razorpay. Use Razorpay's test cards/UPI IDs.
 
 **Mock gateway (development only).** When Razorpay keys are absent and `NODE_ENV` is not `production`, payments use a simulated gateway. The UI labels it prominently ("Development mode: mock payments — no real money is charged") and lets you simulate success or failure. Its results are HMAC-signed and pass through the same `/payments/verify` code as real payments. It is never available in production, and set `ENABLE_MOCK_PAYMENTS=false` to turn it off in development too.
@@ -369,19 +398,82 @@ The **UI tests** (Vitest + React Testing Library) cover route guards, the login 
 
 ## Deployment (Vercel + Render)
 
-### Backend on Render
-1. Push the repo to GitHub.
-2. In Render choose **New → Blueprint** and select the repo; `render.yaml` defines the `hotelpro-api` service (root `server/`, health check `/api/health`). Or create a Web Service manually with root directory `server`, build `npm ci --omit=dev`, start `npm start`.
-3. Set the environment variables: `MONGO_URI` (Atlas), `CLIENT_URL` (your Vercel URL, e.g. `https://hotelpro.vercel.app`), `SERVER_PUBLIC_URL` (the Render URL), `JWT_SECRET` (auto-generated by the blueprint), plus the optional Razorpay, Cloudinary and SMTP values. `NODE_ENV=production` and `TRUST_PROXY=1` are set by the blueprint.
-4. Once deployed, open a **Shell** on the service and run `SEED_ADMIN_EMAIL=… SEED_ADMIN_PASSWORD=… npm run seed` (or set them as env vars first).
-5. Use Cloudinary in production: Render's disk is ephemeral, so local uploads would be lost on redeploy.
+The live site uses this setup. Deploy the **API first**, then the **website**, then connect them.
 
-### Frontend on Vercel
-1. **Add New → Project**, import the repo and set **Root Directory** to `client` (framework preset: Vite).
-2. Add the environment variable `VITE_API_URL=https://<your-render-service>.onrender.com/api`.
-3. Deploy. `client/vercel.json` rewrites all routes to `index.html` so deep links work.
+### 1. MongoDB Atlas
+1. Create a cluster and a database user.
+2. **Network Access → Add IP Address → `0.0.0.0/0`.** Render's outgoing IP addresses change, so without this the API cannot connect.
+3. Use a connection string that **includes the database name**, otherwise data goes into a database called `test`:
+   `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/hotelpro?retryWrites=true&w=majority`
 
-**Cross-site cookies.** Because the site and API are on different domains, production cookies are `Secure; SameSite=None`. CSRF protection uses a token header that only allowed origins can read. Make sure `CLIENT_URL` exactly matches the Vercel origin (no trailing slash). Some browsers block third-party cookies entirely; for the most robust setup, serve the API from a subdomain of your site (e.g. `api.hotelpro.com` with the site on `hotelpro.com`) and set `COOKIE_SAMESITE=lax`.
+### 2. API on Render (Web Service)
+
+| Setting | Value |
+|---|---|
+| Repository / Branch | this repo / `main` |
+| Language | Node |
+| **Root Directory** | `server` |
+| **Build Command** | `npm ci --omit=dev` |
+| **Start Command** | `npm start` |
+| Health Check Path (Advanced) | `/api/health` |
+| Instance type | Free works for testing (sleeps after 15 min idle; the first request then takes ~50 s). Use a paid instance for a real site. |
+
+Environment variables on Render:
+
+| Key | Value |
+|---|---|
+| `NODE_ENV` | `production` |
+| `MONGO_URI` | Atlas connection string (with `/hotelpro`) |
+| `JWT_SECRET` | use Render's **Generate** button (the API refuses to start without a strong secret) |
+| `JWT_EXPIRES_IN` | `1d` |
+| `COOKIE_NAME` | `hotelpro_token` |
+| `TRUST_PROXY` | `1` |
+| `CLIENT_URL` | the exact Vercel URL, e.g. `https://hotel-pro-two.vercel.app` (**no trailing slash**; comma-separate extra domains) |
+| `SERVER_PUBLIC_URL` | the Render URL, e.g. `https://hotelpro-xla6.onrender.com` |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | from Cloudinary → Settings → API Keys (needed because Render's disk is wiped on every deploy) |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | required for online payment in production |
+| `SMTP_*`, `EMAIL_FROM` | optional, for confirmation and password-reset emails |
+
+Alternatively, **New → Blueprint** reads `render.yaml`, which pre-fills the settings above.
+
+**Seeding.** Run `npm run seed` once against the production database, either from a Render **Shell** or locally with `MONGO_URI` pointing at Atlas. In production, `SEED_ADMIN_EMAIL` and a strong `SEED_ADMIN_PASSWORD` (12+ characters with upper and lower case and a digit) are required. The live database was seeded this way.
+
+### 3. Website on Vercel
+
+| Setting | Value |
+|---|---|
+| Framework Preset | Vite |
+| **Root Directory** | `client` |
+| Build Command / Output | defaults (`npm run build` / `dist`) |
+| **Environment variable** | `VITE_API_URL` = `https://<your-render-service>.onrender.com/api` (**must end with `/api`**) |
+
+`VITE_API_URL` is written into the site **at build time**. After changing it, open **Deployments → ⋯ → Redeploy**; saving the variable alone has no effect. `client/vercel.json` rewrites every path to `index.html`, so links such as `/rooms/…` and `/admin` work when opened directly.
+
+### 4. Connect and verify
+1. On Render, set `CLIENT_URL` to the final Vercel URL and save (Render redeploys).
+2. Check `https://<render>/api/health` shows `"database":"connected"` and `"env":"production"`.
+3. Open the website. Rooms should load, and signing in should survive a page reload. That second check confirms the cross-site cookie works.
+4. Sign in as admin at `/admin`, upload a room photo and confirm its URL starts with `https://res.cloudinary.com/`.
+5. Check `https://<render>/api/payments/config` shows `"enabled": true, "provider": "razorpay"` once Razorpay keys are added.
+
+### Deployment verification (live site)
+
+All of the following were checked end to end in a real browser against https://hotel-pro-two.vercel.app:
+
+| Area | Result |
+|---|---|
+| Home (featured rooms, categories), hero search → rooms with live availability | ✅ |
+| Rooms filters, sorting, price limits; room details, gallery, price breakdown | ✅ |
+| Booking while signed out → login → back to checkout | ✅ |
+| Registration with validation; session survives reload (cross-site cookie) | ✅ |
+| Pending booking with server price and 15-minute hold; My Bookings; cancellation | ✅ |
+| Profile edit, logout, protected-route redirect, forgot password, wrong-password message | ✅ |
+| About, Privacy, Terms, custom 404; mobile layout, mobile menu, filter drawer | ✅ |
+| Admin: dashboard, booking search and detail, rooms and editor, Cloudinary upload and delete, user deactivation, all four reports + CSV, audit log, mobile admin menu | ✅ |
+| Contact form for signed-in users | ✅ after the prefill fix in this release (fields were empty after a full page load) |
+| Online payment | ⚠️ disabled until Razorpay keys are set on Render |
+
+**Cross-site cookies.** The website and API are on different domains, so production cookies are `Secure; SameSite=None`, and CSRF protection uses a token header that only allowed origins can read. Browsers that block all third-party cookies (some Safari and privacy settings) will not keep users signed in. For the most robust setup, serve the API from a subdomain of the site's own domain (e.g. `api.yourhotel.com` with the site on `yourhotel.com`) and set `COOKIE_SAMESITE=lax`.
 
 ---
 
@@ -408,7 +500,13 @@ The **UI tests** (Vitest + React Testing Library) cover route guards, the login 
 | `Could not connect to MongoDB` on start-up | Make sure MongoDB is running (`brew services list`, `docker ps`) and `MONGO_URI` is correct. For Atlas, allow your IP and URL-encode special characters in the password. |
 | `Port 8001 is already in use` / Vite says port 5173 in use | Stop the other process (`lsof -i :8001`, then `kill <pid>`) or change `PORT` (and `VITE_API_URL`). |
 | Frontend shows "Cannot reach the server" | Is the API running? Does `VITE_API_URL` include `/api`? Restart Vite after editing `.env`. |
-| CORS errors in the browser console | `CLIENT_URL` must match the browser origin exactly (scheme, host, port, no trailing slash). |
+| CORS errors in the browser console ("No 'Access-Control-Allow-Origin' header") | `CLIENT_URL` on the API must match the browser origin exactly (scheme, host, port, no trailing slash). Render redeploys after you save. |
+| Live site calls `…onrender.com/rooms` (no `/api`) and gets 404 | `VITE_API_URL` on Vercel is missing `/api`. Fix it, then **Redeploy**: the value is fixed at build time. |
+| Data appears in a database called `test` | Add the database name to `MONGO_URI` (`…mongodb.net/hotelpro?…`). |
+| Render deploy fails with "Could not connect to MongoDB" | Allow `0.0.0.0/0` in Atlas Network Access and check `MONGO_URI`. |
+| First request to the live API takes ~50 s | Render's free instance sleeps when idle; use a paid instance or accept the cold start. |
+| Admin password from `.env` doesn't work | Values are trimmed and an unquoted `#` starts a comment. Wrap passwords containing `#` in quotes, re-run the seed, and sign in with the value as the app reads it. |
+| `contentscript.js` / `MaxListenersExceededWarning` in the console | Comes from a browser extension (e.g. a crypto wallet), not HotelPro; ignore it. |
 | "Invalid or missing CSRF token" | Refresh the page. In API tools, call `GET /api/csrf-token` first and send the value as `X-CSRF-Token` with cookies enabled. |
 | Logged out immediately in production | Cookies need HTTPS (`COOKIE_SECURE=true`) and `SameSite=None` across domains. Check the browser isn't blocking third-party cookies (see Deployment). Behind a proxy, set `TRUST_PROXY=1`. |
 | Forgot the admin password | Set `SEED_ADMIN_PASSWORD` in `server/.env` and run `npm run seed` again. |

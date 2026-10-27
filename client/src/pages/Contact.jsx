@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { Clock, Mail, MapPin, Phone, Send } from 'lucide-react';
@@ -14,9 +15,18 @@ import { EMAIL_RULES, NAME_RULES } from '../utils/validation';
 export default function Contact() {
   useDocumentTitle('Contact us');
   const { user } = useAuth();
-  const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, reset, setError, getValues, setValue, formState: { errors, isSubmitting } } = useForm({
     defaultValues: { name: user?.name || '', email: user?.email || '', phone: user?.phone || '', subject: '', message: '' },
   });
+
+  // The session may finish loading after the first render (e.g. on a full page load);
+  // fill in the signed-in user's details then, without overwriting anything typed.
+  useEffect(() => {
+    if (!user) return;
+    for (const [field, value] of [['name', user.name], ['email', user.email], ['phone', user.phone]]) {
+      if (!getValues(field) && value) setValue(field, value);
+    }
+  }, [user, getValues, setValue]);
 
   const onSubmit = async (values) => {
     try {
