@@ -1,0 +1,110 @@
+@import 'tailwindcss';
+@import 'react-day-picker/style.css';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, ui-serif, serif;
+
+  --color-navy-50: #f1f4fa;
+  --color-navy-100: #e1e7f3;
+  --color-navy-200: #c3cee5;
+  --color-navy-300: #94a6cc;
+  --color-navy-400: #6079ab;
+  --color-navy-500: #3f5a8f;
+  --color-navy-600: #2d4473;
+  --color-navy-700: #22355c;
+  --color-navy-800: #172745;
+  --color-navy-900: #0f1d3a;
+  --color-navy-950: #0b1630;
+
+  /* Gold is an accent: use 400-500 on navy, 700-800 for text on light backgrounds. */
+  --color-gold-100: #f8efd2;
+  --color-gold-200: #f0dea4;
+  --color-gold-300: #e5c86f;
+  --color-gold-400: #d8b448;
+  --color-gold-500: #c9a227;
+  --color-gold-600: #a8851c;
+  --color-gold-700: #866914;
+  --color-gold-800: #6a5312;
+
+  --color-beige-50: #fcfaf6;
+  --color-beige-100: #f7f2e9;
+  --color-beige-200: #eee4d3;
+  --color-beige-300: #e0d1b6;
+
+  --shadow-soft: 0 1px 2px rgb(11 22 48 / 0.04), 0 8px 24px -8px rgb(11 22 48 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(11 22 48 / 0.05), 0 18px 40px -12px rgb(11 22 48 / 0.25);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-beige-50 font-sans text-navy-900 antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-serif tracking-tight;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-gold-500;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+  .card {
+    @apply rounded-2xl border border-beige-200 bg-white shadow-soft;
+  }
+  .eyebrow {
+    @apply text-xs font-semibold tracking-[0.2em] text-gold-700 uppercase;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-navy-800;
+  }
+  .field {
+    @apply block w-full rounded-lg border border-navy-200 bg-white px-3.5 py-2.5 text-sm text-navy-900 placeholder:text-navy-300 transition focus:border-gold-500 focus:ring-2 focus:ring-gold-500/30 focus:outline-none disabled:cursor-not-allowed disabled:bg-navy-50;
+  }
+  .field-error {
+    @apply border-red-500 focus:border-red-500 focus:ring-red-500/25;
+  }
+  .table-base {
+    @apply min-w-full divide-y divide-beige-200 text-sm;
+  }
+  .table-base th {
+    @apply bg-beige-100 px-4 py-3 text-left text-xs font-semibold tracking-wide text-navy-600 uppercase;
+  }
+  .table-base td {
+    @apply px-4 py-3 align-middle text-navy-800;
+  }
+}
+
+/* react-day-picker theme */
+.rdp-root {
+  --rdp-accent-color: var(--color-navy-900);
+  --rdp-accent-background-color: var(--color-gold-100);
+  --rdp-day-height: 40px;
+  --rdp-day-width: 40px;
+  --rdp-day_button-height: 38px;
+  --rdp-day_button-width: 38px;
+  --rdp-range_middle-color: var(--color-navy-900);
+  --rdp-today-color: var(--color-gold-700);
+  font-size: 0.875rem;
+}
+.rdp-root .rdp-caption_label {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+}

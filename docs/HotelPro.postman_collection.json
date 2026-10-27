@@ -1,0 +1,1331 @@
+{
+  "info": {
+    "name": "HotelPro API",
+    "description": "HotelPro REST API. Run \"Health & CSRF > Get CSRF token\" first (the pre-request script also does this automatically). Cookies carry the session; Postman keeps them per domain. Set baseUrl to your API, e.g. http://localhost:8001/api.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8001/api"
+    },
+    {
+      "key": "csrfToken",
+      "value": ""
+    },
+    {
+      "key": "roomId",
+      "value": ""
+    },
+    {
+      "key": "bookingId",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "checkIn",
+      "value": "2026-12-10"
+    },
+    {
+      "key": "checkOut",
+      "value": "2026-12-12"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Fetch a CSRF token once and attach it to state-changing requests.",
+          "const method = pm.request.method;",
+          "if (['POST','PATCH','PUT','DELETE'].includes(method) && !pm.request.url.toString().includes('/payments/webhook')) {",
+          "  const send = (token) => pm.request.headers.upsert({ key: 'X-CSRF-Token', value: token });",
+          "  const token = pm.collectionVariables.get('csrfToken');",
+          "  if (token) { send(token); } else {",
+          "    pm.sendRequest({ url: pm.collectionVariables.get('baseUrl') + '/csrf-token', method: 'GET' }, (err, res) => {",
+          "      const t = res.json().data.csrfToken; pm.collectionVariables.set('csrfToken', t); send(t);",
+          "    });",
+          "  }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & CSRF",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Returns 200 when the API and MongoDB are up, 503 otherwise."
+          }
+        },
+        {
+          "name": "Get CSRF token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/csrf-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "csrf-token"
+              ]
+            },
+            "description": "Issues the double-submit CSRF token (also set as an HttpOnly cookie)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('csrfToken', pm.response.json().data.csrfToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Creates a guest account and signs in (sets HttpOnly cookie). Role is always \"user\".",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Asha Rao\",\n  \"email\": \"asha@example.com\",\n  \"phone\": \"9876543210\",\n  \"password\": \"Secret123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Rate limited: 10 attempts / 15 min.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"asha@example.com\",\n  \"password\": \"Secret123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login as admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Use the credentials printed by `npm run seed`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@hotelpro.local\",\n  \"password\": \"<from npm run seed>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Current user (protected)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "401 without a valid session."
+          }
+        },
+        {
+          "name": "Session (optional)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "session"
+              ]
+            },
+            "description": "Returns { user: null } for anonymous visitors. Used by the SPA at start-up."
+          }
+        },
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Name and phone only.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Asha R.\",\n  \"phone\": \"9123456789\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Revokes all other sessions.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Secret123\",\n  \"newPassword\": \"Secret456\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Forgot password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Always returns the same response. In development without SMTP the reset link is printed in the server console.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"asha@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reset password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Single-use token, expires after RESET_TOKEN_TTL_MINUTES.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"<64-hex token from the email link>\",\n  \"password\": \"Recovered123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Clears the auth cookie."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rooms",
+      "item": [
+        {
+          "name": "List rooms",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms?page=1&limit=9&sort=price_asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rooms"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "9"
+                },
+                {
+                  "key": "sort",
+                  "value": "price_asc"
+                }
+              ]
+            },
+            "description": "Filters: q, category (comma list), amenities (comma list), minPrice, maxPrice, capacity, featured, sort (price_asc|price_desc|popularity|newest|capacity). Add checkIn, checkOut, adults, children, rooms for availability + quote; availableOnly=true to hide sold-out rooms."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json().data; if (d && d.length) pm.collectionVariables.set('roomId', d[0]._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search with stay",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms?checkIn={{checkIn}}&checkOut={{checkOut}}&adults=2&rooms=1&availableOnly=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rooms"
+              ],
+              "query": [
+                {
+                  "key": "checkIn",
+                  "value": "{{checkIn}}"
+                },
+                {
+                  "key": "checkOut",
+                  "value": "{{checkOut}}"
+                },
+                {
+                  "key": "adults",
+                  "value": "2"
+                },
+                {
+                  "key": "rooms",
+                  "value": "1"
+                },
+                {
+                  "key": "availableOnly",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Each room includes availability.availableUnits, isAvailable and a server-calculated quote."
+          }
+        },
+        {
+          "name": "Room metadata",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms/meta",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rooms",
+                "meta"
+              ]
+            },
+            "description": "Categories with counts, amenities, bed types, price range and hotel policies."
+          }
+        },
+        {
+          "name": "Availability for one room",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms/availability?roomId={{roomId}}&checkIn={{checkIn}}&checkOut={{checkOut}}&adults=2&children=0&rooms=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rooms",
+                "availability"
+              ],
+              "query": [
+                {
+                  "key": "roomId",
+                  "value": "{{roomId}}"
+                },
+                {
+                  "key": "checkIn",
+                  "value": "{{checkIn}}"
+                },
+                {
+                  "key": "checkOut",
+                  "value": "{{checkOut}}"
+                },
+                {
+                  "key": "adults",
+                  "value": "2"
+                },
+                {
+                  "key": "children",
+                  "value": "0"
+                },
+                {
+                  "key": "rooms",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Omit roomId to check every active room."
+          }
+        },
+        {
+          "name": "Get room",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms/{{roomId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rooms",
+                "{{roomId}}"
+              ]
+            },
+            "description": "404 for inactive rooms."
+          }
+        },
+        {
+          "name": "Create room (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rooms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rooms"
+              ]
+            },
+            "description": "Admin only. Every field is validated server-side.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Garden Studio\",\n  \"roomNumber\": \"STD-110\",\n  \"category\": \"standard\",\n  \"description\": \"A bright studio overlooking the gardens with a queen bed and work desk.\",\n  \"pricePerNight\": 5200,\n  \"maxAdults\": 2,\n  \"maxChildren\": 1,\n  \"bedType\": \"queen\",\n  \"beds\": 1,\n  \"size\": 300,\n  \"view\": \"Garden\",\n  \"amenities\": [\n    \"Free Wi-Fi\",\n    \"Work Desk\"\n  ],\n  \"images\": [],\n  \"inventory\": 4,\n  \"isActive\": true,\n  \"featured\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Update room (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rooms/{{roomId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rooms",
+                "{{roomId}}"
+              ]
+            },
+            "description": "Admin only. Inventory cannot drop below units already booked on any future night.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pricePerNight\": 5400,\n  \"amenities\": [\n    \"Free Wi-Fi\",\n    \"Work Desk\",\n    \"Smart TV\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Deactivate room (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms/{{roomId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rooms",
+                "{{roomId}}"
+              ]
+            },
+            "description": "Soft delete: hides the room; existing bookings remain valid."
+          }
+        },
+        {
+          "name": "Delete room permanently (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms/{{roomId}}?permanent=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rooms",
+                "{{roomId}}"
+              ],
+              "query": [
+                {
+                  "key": "permanent",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Only allowed for rooms that have never been booked."
+          }
+        },
+        {
+          "name": "Upload images (admin)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/rooms/{{roomId}}/images",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rooms",
+                "{{roomId}}",
+                "images"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "multipart/form-data field \"images\" (up to 8 files, JPEG/PNG/WebP, 5 MB each). Stored on Cloudinary if configured, else server/uploads."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bookings"
+              ]
+            },
+            "description": "Creates a PENDING booking that holds inventory for PENDING_BOOKING_TTL_MINUTES. Prices are computed on the server. Re-sending the same idempotencyKey returns the original booking (200).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roomId\": \"{{roomId}}\",\n  \"checkIn\": \"{{checkIn}}\",\n  \"checkOut\": \"{{checkOut}}\",\n  \"adults\": 2,\n  \"children\": 0,\n  \"rooms\": 1,\n  \"guest\": {\n    \"firstName\": \"Asha\",\n    \"lastName\": \"Rao\",\n    \"email\": \"asha@example.com\",\n    \"phone\": \"9876543210\",\n    \"specialRequests\": \"High floor\"\n  },\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json().data; if (d) pm.collectionVariables.set('bookingId', d._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My bookings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/bookings/my?status=upcoming&page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bookings",
+                "my"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "upcoming"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "status: upcoming | past | cancelled | any booking status."
+          }
+        },
+        {
+          "name": "Get booking",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/bookings/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bookings",
+                "{{bookingId}}"
+              ]
+            },
+            "description": "Owner or admin only (others get 404). Includes payments and cancellationPreview."
+          }
+        },
+        {
+          "name": "Cancel booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bookings/{{bookingId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bookings",
+                "{{bookingId}}",
+                "cancel"
+              ]
+            },
+            "description": "Free cancellation ≥ 48h before check-in; later = one night fee. Not allowed after check-in time.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Change of plans\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Payment config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payments/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "config"
+              ]
+            },
+            "description": "Shows whether Razorpay or the development mock gateway is active."
+          }
+        },
+        {
+          "name": "Create order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/create-order",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "create-order"
+              ]
+            },
+            "description": "Creates (or reuses) a gateway order for the booking total.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json().data; if (d) pm.collectionVariables.set('orderId', d.orderId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mock checkout (DEV ONLY)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/mock/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "mock",
+                "checkout"
+              ]
+            },
+            "description": "Development only, disabled in production or when Razorpay is configured. Returns a signed paymentId/signature to pass to /verify. No money moves.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"outcome\": \"success\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json().data; if (d && d.paymentId) { pm.collectionVariables.set('paymentId', d.paymentId); pm.collectionVariables.set('signature', d.signature); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "verify"
+              ]
+            },
+            "description": "HMAC-SHA256 signature verified server-side. Idempotent.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"orderId\": \"{{orderId}}\",\n  \"paymentId\": \"{{paymentId}}\",\n  \"signature\": \"{{signature}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Report failed/cancelled checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/failure",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "failure"
+              ]
+            },
+            "description": "Records the failure; the booking stays pending so the guest can retry.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"orderId\": \"{{orderId}}\",\n  \"reason\": \"Checkout closed\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Razorpay webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Razorpay-Signature",
+                "value": "<hmac-sha256 of raw body with RAZORPAY_WEBHOOK_SECRET>"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "webhook"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"payment.captured\",\n  \"payload\": {\n    \"payment\": {\n      \"entity\": {\n        \"id\": \"pay_xxx\",\n        \"order_id\": \"order_xxx\"\n      }\n    }\n  }\n}"
+            },
+            "description": "Called by Razorpay. Handles payment.captured, order.paid, payment.failed, refund.processed. Signature required; no CSRF/cookies."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "dashboard"
+              ]
+            },
+            "description": "KPIs, 30-day trends, 7-night occupancy forecast, recent bookings."
+          }
+        },
+        {
+          "name": "Revenue report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports?type=revenue&from=2026-10-01&to=2026-10-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "reports"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "revenue"
+                },
+                {
+                  "key": "from",
+                  "value": "2026-10-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-10-31"
+                }
+              ]
+            },
+            "description": "type: revenue | bookings | occupancy | cancellations. Max 366 days."
+          }
+        },
+        {
+          "name": "Bookings report (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports?type=bookings&format=csv",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "reports"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "bookings"
+                },
+                {
+                  "key": "format",
+                  "value": "csv"
+                }
+              ]
+            },
+            "description": "Returns text/csv as an attachment."
+          }
+        },
+        {
+          "name": "List bookings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/bookings?q=HP&status=confirmed&paymentStatus=paid&page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "HP"
+                },
+                {
+                  "key": "status",
+                  "value": "confirmed"
+                },
+                {
+                  "key": "paymentStatus",
+                  "value": "paid"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Also: from, to, dateField (checkIn|createdAt), room, user."
+          }
+        },
+        {
+          "name": "Booking detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/bookings/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "bookings",
+                "{{bookingId}}"
+              ]
+            },
+            "description": "Includes payments and audit trail."
+          }
+        },
+        {
+          "name": "Update booking status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/bookings/{{bookingId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "bookings",
+                "{{bookingId}}",
+                "status"
+              ]
+            },
+            "description": "Allowed: confirmed→checked_in|no_show, checked_in→checked_out, pending|confirmed→cancelled (full refund). Audited.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"checked_in\",\n  \"note\": \"Arrived early\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users?q=&role=user&status=active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": ""
+                },
+                {
+                  "key": "role",
+                  "value": "user"
+                },
+                {
+                  "key": "status",
+                  "value": "active"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "User detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/<userId>",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "<userId>"
+              ]
+            },
+            "description": "Profile, booking history and spend."
+          }
+        },
+        {
+          "name": "Activate / deactivate user",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/<userId>/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "<userId>",
+                "status"
+              ]
+            },
+            "description": "Cannot target yourself or other admins. Deactivation ends active sessions.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false,\n  \"reason\": \"Chargeback investigation\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Admin room list",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/rooms?status=inactive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "rooms"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "inactive"
+                }
+              ]
+            },
+            "description": "Includes inactive rooms."
+          }
+        },
+        {
+          "name": "Room booking history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/rooms/{{roomId}}/bookings?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "rooms",
+                "{{roomId}}",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Audit logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit-logs?entityType=Booking",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "entityType",
+                  "value": "Booking"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Contact messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/messages?status=new",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "new"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contact",
+      "item": [
+        {
+          "name": "Send enquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contact",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contact"
+              ]
+            },
+            "description": "Rate limited: 10 / hour.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Asha Rao\",\n  \"email\": \"asha@example.com\",\n  \"phone\": \"\",\n  \"subject\": \"Airport transfer\",\n  \"message\": \"Could you arrange a pickup for our arrival on the 10th?\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
